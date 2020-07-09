@@ -5,7 +5,6 @@ from pymysql import connect
 from selenium.webdriver.common.keys import Keys
 import threading
 
-
 database_name = 'meituan'
 
 
@@ -87,7 +86,7 @@ def soup_meituan_shop(html, sql):
 
     # 当前时间
     creat_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    sql_url = "INSERT  INTO shop VALUES(null ,'{}','{}','{}','{}','{}','{}','{}','{}')".format(
+    sql_url = "INSERT  INTO shop_self VALUES(null ,'{}','{}','{}','{}','{}','{}','{}','{}')".format(
         shop_id, shop_name, shop_id_url, shop_score, shop_comment, shop_comment_count, shop_cognition, creat_time)
     sql.insert_info(sql_url)
 
@@ -125,7 +124,7 @@ class meituan_sql():
 
     def creat_comment_list_db(self):
         '''创建表格，用于储存淘宝列表信息'''
-        self.cs1.execute('''CREATE TABLE  if not EXISTS meituan_comment (
+        self.cs1.execute('''CREATE TABLE  if not EXISTS meituan_comment_self (
           `id` int NOT NULL AUTO_INCREMENT COMMENT '评论id',
           `shop_id` int NOT NULL ,
           `shop_name` varchar(100) NOT NULL ,
@@ -147,7 +146,7 @@ class meituan_sql():
 
     def creat_shop_db(self):
         '''创建表格，用于储存淘宝列表信息'''
-        self.cs1.execute('''CREATE TABLE  if not EXISTS shop (
+        self.cs1.execute('''CREATE TABLE  if not EXISTS shop_self (
           `id` int NOT NULL AUTO_INCREMENT COMMENT 'shop 自增 id',
           `shop_id` int NOT NULL ,
           `shop_name` varchar(100) NOT NULL ,
@@ -168,53 +167,46 @@ class meituan_sql():
     def insert_comment_info(self, data):
         '''批量插入评论到数据库，需传递过来的是个列表'''
         try:
-            sql_url = "INSERT  INTO meituan_comment VALUES(null ,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            sql_url = "INSERT  INTO meituan_comment_self VALUES(null ,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
             self.cs1.executemany(sql_url, data)
             self.conn.commit()
             print('插入评论数据')
         except:
             import traceback
             traceback.print_exc()
-            # self.conn.rollback()
-
-
-def more_thread_webdriver(item):
-    mt_sql = meituan_sql()
-    driver = webdriver.Chrome()
-    driver.maximize_window()
-    driver.implicitly_wait(5)
-
-    url = "https://www.meituan.com/feedback/%s/" % item
-    driver.get(url)
-    time.sleep(0.5)
-    driver.find_element_by_xpath('//*[@id="react"]/div/div/div[2]/div[1]/div/div[2]/div[2]/div/span[1]').click()
-    time.sleep(0.5)
-    soup_meituan_shop(driver.page_source, mt_sql)  # 抓取店铺信息
-
-    i = 1
-    try:
-        while True:
-            soup_meituan_comment(driver.page_source, mt_sql)
-            driver.find_element_by_class_name('icon-btn_right').click()
-            i = i + 1
-            print("该爬取页数" + str(i))
-            time.sleep(1)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print("报错" * 50)
+            self.conn.rollback()
 
 
 if __name__ == "__main__":
 
-    # mt_sql =meituan_sql()#所有线程共用一个线程池，造成多线程并发，出现冲突，可以使用线程锁或者每个线程创建一个连接
-    shop_list = ['118865503','63319969','195958554','184614863','1479205367','2417425','1069571113','190457441','98514636','5987338']
+    mt_sql = meituan_sql()
+    shop_list = ['118865503', '63319969', '195958554', '184614863', '1479205367', '2417425', '1069571113', '190457441',
+                 '98514636', '5987338']
 
     for item in shop_list:
-        th1 = threading.Thread(target=more_thread_webdriver,
-                               args=(item,))
-        th1.start()
-        time.sleep(2)
+        driver = webdriver.Chrome()
+        driver.maximize_window()
+        driver.implicitly_wait(5)
 
+        url = "https://www.meituan.com/feedback/%s/" % item
+        driver.get(url)
+        time.sleep(0.5)
+        driver.find_element_by_xpath('//*[@id="react"]/div/div/div[2]/div[1]/div/div[2]/div[2]/div/span[1]').click()
+        time.sleep(0.5)
+        soup_meituan_shop(driver.page_source, mt_sql)  # 抓取店铺信息
 
+        i = 1
+        try:
+            while True:
+                soup_meituan_comment(driver.page_source, mt_sql)
+                driver.find_element_by_class_name('icon-btn_right').click()
+                i = i + 1
+                print("该爬取页数" + str(i))
+                time.sleep(1)
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            print("报错" * 50)
+            continue
 
